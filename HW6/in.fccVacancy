@@ -1,0 +1,124 @@
+############## Initialization #################
+# atom_style: set atom style to atomic        # 
+# units: choose metal units                   #
+# boundary: choose periodic boundary condition#
+###############################################
+
+atom_style       atomic
+units            metal
+boundary         p p p
+
+############# Crystal Structure ####################################################
+# lattice: fcc with lattice constant 1.57                                          # 
+# region: size of simulation box (multiples of lattice constant)                   #
+# create_box: create simulation box                                                #
+# create_atoms: generate atoms at lattice points of type 1                         #
+# mass: set mass of atoms of type 1 to be 1.0 (required but doesn’t affect results)#        
+####################################################################################
+
+lattice          fcc 1.57
+region           simulation_box block 0 5 0 5 0 5
+create_box       1 simulation_box
+create_atoms     1 region simulation_box
+mass             1 1.0
+
+
+################## Specify potential #####################
+# pair_style: LJ potential with cutoff distance of 1.58  #
+# pair_coeff: set epsilon and sigma to be 1              #
+##########################################################
+
+pair_style       lj/cut 1.58
+pair_coeff       * *  1 1
+
+
+#### define parameters to be computed  ####
+# eperatom: potential energy per atom     #
+# etotal:   total potential energy        #
+###########################################
+
+compute          eperatom all pe/atom 
+compute          etotal all reduce sum c_eperatom
+
+################# set results output ###############################################
+# thermo: dump thermodynamic data after every 1 time step                          #
+# thermo_style: specify parameters to be dumped at each time step                  #
+#   pe: potential energy                                                           #
+#   lx,ly,lz: size of simulation box                                               # 
+#   xlat,ylat,zlat: lattice parameter in x, y and z direction                      #
+# dump: dump updated coordinates of each atom at every 10 time step in dump.perfect#
+# undump: close dump file with id 1                                                #           
+####################################################################################
+
+thermo           1
+thermo_style     custom step pe lx ly lz c_etotal xlat ylat zlat
+dump		 1 all custom 10 dump.perfect id type x y z c_eperatom
+
+###### minimize energy of the system ###################
+# minimize   etol ftol maxiter maxeval                 #
+#    etol = stopping tolerance for energy (unitless)   #
+#    ftol = stopping tolerance for force (force units) #
+#    maxiter = max iterations of minimizer             #
+#    maxeval = max number of force/energy evaluations  #
+########################################################
+
+
+minimize         1e-15 1e-15 5000 5000
+
+undump           1
+
+
+#### define variables ##########################
+# Ei: total initial energy of perfect crystal  #
+# No: total number of atoms                    #
+################################################
+
+variable         E equal c_etotal
+variable         Ei equal $E
+variable         N equal count(all) 
+variable         No equal $N
+
+
+############## create vacancy #################
+# group: put atom with id 1 in group vacancy  #
+# delete_atoms: delete atoms in group vacancy #
+###############################################
+
+group            vacancy id 1 50
+delete_atoms     group vacancy compress yes
+
+######## reset time step counter to zero #######
+
+reset_timestep   0
+
+####### repeat the energy minimization procedure ######
+
+thermo           1
+thermo_style     custom step pe lx ly lz c_etotal xlat ylat zlat
+dump		 1 all custom 10 dump.imperfect id type x y z c_eperatom
+minimize         1e-15 1e-15 5000 5000
+
+################# define variables #################
+# Ef: total final energy of the imperfect crystal  #
+# Ev: Energy of vacancy formation defined as       # 
+#     Ef-((No-1)*Ei/No)                            #
+####################################################
+
+variable         E equal c_etotal
+variable         Ef equal $E
+variable         Ev equal (${Ef}-((${No}-1)/${No})*${Ei})
+
+########## print results in the terminal ################
+
+print "Total number of atoms = ${No}"
+print "Initial energy of atoms = ${Ei}"
+print "Final energy of atoms = ${Ef}"
+print "Vacancy formation energy = ${Ev}"
+
+
+##########################  Comments ###############################
+# for visualization use dump files
+# log files can be used to see step by step execution of this script
+# log files also contain thermodynamic data of each time step 
+
+

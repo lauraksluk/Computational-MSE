@@ -1,0 +1,85 @@
+#Initialization
+
+units metal
+boundary s s s
+atom_style atomic
+read_data polymer.dat
+
+# Meam Potential for Saturated Hydrocarbons Information
+
+pair_style meam
+pair_coeff * * library.meam C H CH.meam C H
+
+##################################################################################
+#Minimization
+
+minimize 0.0 1.0e-8 100000 100000
+
+# Equilibration
+
+reset_timestep 0
+velocity 		all create 0.0 1231 dist gaussian
+fix 			1 all nve
+fix 			2 all langevin 0 0 0.001 904297
+
+# Dump
+dump 1 all custom 1000 minimized.txt id type x y z
+
+thermo_style 	custom step etotal press vol temp density pxx pyy pzz
+thermo	  	100
+timestep 		0.0003
+run 			20000
+unfix 1
+unfix 2
+
+######################################################################
+# Deformation
+
+reset_timestep 0
+
+#Define Variables
+
+variable 	yl equal "ylo-1"
+variable 	yh equal "yhi-1"
+variable 	yh2 equal "yhi*3"
+variable 	y_step equal "yhi/2"
+
+variable 	p3 equal "ly"
+variable 	L0 equal ${p3}
+variable 	strain equal "(ly - v_L0)/v_L0"
+variable 	p1 equal v_strain
+variable 	p2 equal "-pyy/10"
+
+# define groups
+
+region   	1 block INF INF INF ${yl} INF INF
+group		wall region 1
+region	2 block INF INF ${yh} INF INF INF
+group		pull region 2
+group		boundary union wall pull
+group		mobile subtract all wall pull
+
+# computes
+
+compute peratom all stress/atom NULL pair	
+
+# initial velocities
+
+velocity	mobile create 0.01 887723 
+velocity	pull set 0.0 .5 0.0
+velocity	mobile ramp vy 0 ${y_step} y 0 ${yh2} sum yes
+
+# fixes
+
+fix	f1 all nve
+fix 	ftemp all langevin 25 25 0.05 904297 
+fix	f2 boundary setforce NULL 0.0 0.0
+
+# Dump
+dump 100 all custom 1000 stress_per_atom.txt id type x y z c_peratom[1] c_peratom[2] c_peratom[3] c_peratom[4] c_peratom[5] c_peratom[6]
+fix def1 all print 100 "${p1} ${p2}" file Stress_strain.def1.txt screen no
+
+thermo_style custom step temp pyy lx ly lz v_strain
+thermo 1000
+timestep 0.0005
+run   50000

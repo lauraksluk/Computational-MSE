@@ -1,0 +1,60 @@
+# LAMMPS input file for the simulation of bulk Lennard-Jones material
+# at various densities and initial temperatures
+
+# Define adjustable parameters
+variable       rho equal 1 # reduced density
+variable       T equal 1.4 # reduced temperature
+variable       dt equal 0.005 # reduced timestep
+variable       cut equal 2.5 # cutoff for Lennard-Jones potential
+variable       seed equal 4 # random seed for velocity initialization
+                            # set to RFC 1149.5 compliant value
+
+# Define global simulation parameters
+units          lj
+dimension      3
+atom_style     atomic
+timestep       ${dt}
+
+# Create atoms
+lattice        fcc ${rho}
+region         region_entire block 0 6 0 6 0 6
+create_box     1 region_entire
+create_atoms   1 box
+
+# Define atom masses and potential for atom interaction
+mass           1 1.0
+pair_style     lj/cut ${cut}
+pair_coeff     * * 1 1
+
+# modify neighbors
+neighbor 0.3 bin 
+neigh_modify delay 10 check yes 
+
+# Initialize atom velocities to specified temperature
+velocity       all create $T ${seed}
+
+# Set up calculation of average temperatures and pressures
+fix            temp_avg all ave/time 1 1 1 c_thermo_temp ave window 1000
+fix            press_avg all ave/time 1 1 1 c_thermo_press ave window 1000
+
+
+
+# Set up printing of thermodynamic properties during simulation
+thermo_style   custom step temp f_temp_avg press f_press_avg density &
+               pe ke etotal
+thermo         100
+
+# Set up output of atom positions and thermodynamic properties
+dump           atom_position_dump all atom 100 &
+               LJ-atom-positions.dump
+fix            write_thermo_info all print 10 "$(step) $(temp) &
+               $(f_temp_avg) $(press) $(f_press_avg) $(density) &
+               $(pe) $(ke) $(etotal)" &
+               file LJ-thermo-info.txt screen no 
+
+# Set up motion integrator for NVE ensemble
+fix            nve_integrator all nve
+
+	       
+# Run simulation
+run            5000
