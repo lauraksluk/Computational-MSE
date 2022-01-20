@@ -1,0 +1,11 @@
+name: 27-734
+channels:
+  - defaults
+dependencies:
+  - python=3.8.5
+  - pip=20.3.3
+  - pip:
+    - numpy==1.19.5 
+    - matplotlib==3.3.4
+    - scipy==1.6.0
+    

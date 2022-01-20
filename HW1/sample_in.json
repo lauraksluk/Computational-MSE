@@ -1,0 +1,1 @@
+{"xmax": 2, "delx": 0.05, "tmax": 10, "delt": 0.01, "alpha": 0.05, "c0": 0.5, "cxmax": 0.5, "ic": "lambda x: -0.5*x**2 + x + 0.5"}
